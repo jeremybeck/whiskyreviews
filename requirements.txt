@@ -1,0 +1,9 @@
+langchain
+langchain-community
+langchain-openai
+pandas
+streamlit
+pymongo[srv]
+praw
+langchain-mongodb
+certifi
