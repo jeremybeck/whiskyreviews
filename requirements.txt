@@ -7,3 +7,8 @@ pymongo[srv]
 praw
 langchain-mongodb
 certifi
+thefuzz
+scipy
+scikit-learn
+sentence-transformers
+numpy<2
