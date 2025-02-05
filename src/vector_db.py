@@ -1,8 +1,11 @@
 from pymongo.mongo_client import MongoClient
 from pymongo.server_api import ServerApi
+from langchain_mongodb.vectorstores import MongoDBAtlasVectorSearch
 import certifi
+import streamlit as st
+from language_models import embedding_model
 
-uri = f"mongodb+srv://{os.getenv('whiskeydb_admin')}:{os.getenv('whiskeydb_pwd')}@{os.getenv('whiskeydb_url')}/?retryWrites=true&w=majority&appName=WhiskeyRecommender"
+uri = f"mongodb+srv://{st.secrets['whiskeydb_ro']}:{st.secrets['whiskeydb_pwd_ro']}@{st.secrets['whiskeydb_url']}/?retryWrites=true&w=majority&appName=WhiskeyRecommender"
 ca = certifi.where()
 
 # Create a new client and connect to the server

@@ -1,6 +1,8 @@
 from langchain_openai import ChatOpenAI
 from sentence_transformers import SentenceTransformer
-
+from typing import List
+import streamlit as st
+import os
 
 class SentenceTransformerEmbeddings:
     """Wrapper for SentenceTransformers model to work with LangChain vector stores."""
@@ -20,4 +22,4 @@ class SentenceTransformerEmbeddings:
 
 embedding_model = SentenceTransformerEmbeddings("all-MiniLM-L6-v2")
 
-base_llm = ChatOpenAI(openai_api_key=os.getenv('whiskey_key'), model='gpt-4o-mini', temperature=0.5)
+base_llm = ChatOpenAI(openai_api_key=st.secrets['whiskey_key'], model='gpt-4o-mini', temperature=0.5)
