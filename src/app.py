@@ -29,23 +29,23 @@ def display_whiskey(whiskey_doc):
     finish_tags = whiskey_doc.metadata.get("finish_tags", [])
 
     # Markdown display
-    st.markdown(f"### {distillery}")  # Distillery
-    st.markdown(f"**{whiskey_name}**")  # Whiskey Name
+    st.markdown(f"### {whiskey_name}")
+    st.markdown(f"**{distillery}**")
     st.markdown(f"🕰️ Age: {age}")  # Age Statement
     st.markdown(f"📍 Region: {region}")  # Region
 
     # Display tags as pills
     if nose_tags:
-        st.markdown("👃 **Nose Notes:**")
-        pills("nose", nose_tags, format_func=lambda x: x, index=None)
+        #st.markdown("👃 **Nose Notes:**")
+        pills("👃 Nose Notes:", nose_tags, format_func=lambda x: x, index=None)
 
     if palette_tags:
-        st.markdown("👅 **Palette Notes:**")
-        pills("palette", palette_tags, format_func=lambda x: x, index=None)
+        #st.markdown("👅 **Palette Notes:**")
+        pills("👅 Palette Notes:", palette_tags, format_func=lambda x: x, index=None)
 
     if finish_tags:
-        st.markdown("🥃 **Finish Notes:**")
-        pills("finish", finish_tags, format_func=lambda x: x, index=None)
+        #st.markdown("🥃 **Finish Notes:**")
+        pills("🥃 Finish Notes:", finish_tags, format_func=lambda x: x, index=None)
 
 
 # User Query Input
@@ -60,7 +60,7 @@ if query:
         for doc, score in results:
             whiskey_name = doc.metadata.get("whiskey_name", "Unknown Whiskey")
             whiskey_id = doc.metadata.get('_id')
-            with st.expander(f"**{whiskey_name}_{whiskey_id}** (Score: {score:.2f})"):
+            with st.expander(f"**{whiskey_name}** (Score: {score:.2f})"):
                 display_whiskey(doc)  # ✅ Use the new function
 
                 # Bookmark button
