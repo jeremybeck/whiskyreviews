@@ -91,20 +91,19 @@ if query:
     results = vector_store.similarity_search_with_score(query, k=num_whiskies, pre_filter=filter_conditions)
 
     if results:
-        if len(results) == 0:
-            st.subheader('No Results - Try Another Query')
-        else:
-            st.subheader("🍂 Recommended Whiskeys")
-            for doc, score in results:
-                whiskey_name = doc.metadata.get("whiskey_name", "Unknown Whiskey")
-                whiskey_id = doc.metadata.get('_id')
-                with st.expander(f"**{whiskey_name}** (Score: {score:.2f})"):
-                    display_whiskey(doc)  # ✅ Use the new function
+        st.subheader("🍂 Recommended Whiskeys")
+        for doc, score in results:
+            whiskey_name = doc.metadata.get("whiskey_name", "Unknown Whiskey")
+            whiskey_id = doc.metadata.get('_id')
+            with st.expander(f"**{whiskey_name}** (Score: {score:.2f})"):
+                display_whiskey(doc)  # ✅ Use the new function
 
-                    # Bookmark button
-                    if st.button(f"📌 Add {whiskey_name} to Wishlist", key=f"{whiskey_name}_{whiskey_id}"):
-                        if f"{whiskey_name}_{whiskey_id}" not in st.session_state.wishlist:
-                            st.session_state.wishlist.append(f"{whiskey_name}_{whiskey_id}")
+                # Bookmark button
+                if st.button(f"📌 Add {whiskey_name} to Wishlist", key=f"{whiskey_name}_{whiskey_id}"):
+                    if f"{whiskey_name}_{whiskey_id}" not in st.session_state.wishlist:
+                        st.session_state.wishlist.append(f"{whiskey_name}_{whiskey_id}")
+    else:
+        st.subheader('No Results - Try Another Query')
 
 else:
     st.write("👆 Enter a description to find similar whiskeys.")
