@@ -22,11 +22,15 @@ except Exception as e:
     print(e)
 
 
-collection = client["whiskey_database"]["vectordb_singleembed"]
+vectordb = client["whiskey_database"]["vectordb_singleembed"]
 
 vector_store = MongoDBAtlasVectorSearch(
-   collection = collection,         # Collection to store embeddings
+   collection = vectordb,         # Collection to store embeddings
    embedding = embedding_model,   # Embedding model to use
-   index_name = "vector_index",    # Name of the vector search index
+   index_name = "test_index",    # Name of the vector search index
    relevance_score_fn = "cosine"   # Similarity score function, can also be "euclidean" or "dotProduct"
 )
+
+
+reviews = client['whiskey_reviews']['parsed_reviews']
+

@@ -15,6 +15,18 @@ if "wishlist" not in st.session_state:
 for whiskey in st.session_state.wishlist:
     st.sidebar.write(f"- {whiskey}")
 
+##distinct_regions = vectordb.distinct("distillery_region")# Fetch distinct regions
+#distinct_types = vectordb.distinct("whiskey_type")  # Fetch distinct whiskey types
+distinct_regions = ["Highlands", "Lowlands", "Speyside", "Islay", "Campbeltown", "Kentucky", "Tennessee", "Ireland",  "Japan"]
+distinct_types =    ["Rye","Bourbon","Scotch", "Irish", "Japanese"]
+distinct_countries = vectordb.distinct('whiskey_country_of_origin')
+
+# 🔹 Sidebar Filters
+num_whiskies = st.sidebar.slider("Number of Whiskeys", min_value=5, max_value=20, value=10, step=1)
+selected_region = st.sidebar.selectbox("🌍 Filter by Region", ["All"] + distinct_regions)
+selected_type = st.sidebar.selectbox("🥃 Filter by Whiskey Type", ["All"] + distinct_types)
+selected_country = st.sidebar.selectbox("🥃 Filter by Country", ["All"] + distinct_countries)
+
 def display_whiskey(whiskey_doc):
     """Displays whiskey details in markdown format with tag pills."""
 
@@ -48,25 +60,51 @@ def display_whiskey(whiskey_doc):
         pills("🥃 Finish Notes:", finish_tags, format_func=lambda x: x, index=None)
 
 
+def construct_pre_filter(selected_region=None, selected_type=None, selected_country=None):
+    pre_filter = {}
+
+    if selected_region:
+        if selected_region == 'All':
+            pass
+        else:
+            pre_filter["distillery_region"] = {"$eq": selected_region}
+    if selected_type:
+        if selected_type == 'All':
+            pass
+        else:
+            pre_filter["whiskey_type"] = {"$eq": selected_type}
+    if selected_country:
+        if selected_country == 'All':
+            pass
+        else:
+            pre_filter["whiskey_country_of_origin"] = {"$eq": selected_country}
+
+    return pre_filter if pre_filter else None  # Return None if no filters are applied
+
 # User Query Input
 query = st.text_input("🔍 Describe what you're looking for in a whiskey:")
 
 if query:
+    filter_conditions = construct_pre_filter(selected_region=selected_region, selected_type=selected_type, selected_country=selected_country)
+    print(filter_conditions)
     # Search vector database
-    results = vector_store.similarity_search_with_score(query, k=5)
+    results = vector_store.similarity_search_with_score(query, k=num_whiskies, pre_filter=filter_conditions)
 
     if results:
-        st.subheader("🍂 Recommended Whiskeys")
-        for doc, score in results:
-            whiskey_name = doc.metadata.get("whiskey_name", "Unknown Whiskey")
-            whiskey_id = doc.metadata.get('_id')
-            with st.expander(f"**{whiskey_name}** (Score: {score:.2f})"):
-                display_whiskey(doc)  # ✅ Use the new function
+        if len(results) == 0:
+            st.subheader('No Results - Try Another Query')
+        else:
+            st.subheader("🍂 Recommended Whiskeys")
+            for doc, score in results:
+                whiskey_name = doc.metadata.get("whiskey_name", "Unknown Whiskey")
+                whiskey_id = doc.metadata.get('_id')
+                with st.expander(f"**{whiskey_name}** (Score: {score:.2f})"):
+                    display_whiskey(doc)  # ✅ Use the new function
 
-                # Bookmark button
-                if st.button(f"📌 Add {whiskey_name} to Wishlist", key=f"{whiskey_name}_{whiskey_id}"):
-                    if f"{whiskey_name}_{whiskey_id}" not in st.session_state.wishlist:
-                        st.session_state.wishlist.append(f"{whiskey_name}_{whiskey_id}")
+                    # Bookmark button
+                    if st.button(f"📌 Add {whiskey_name} to Wishlist", key=f"{whiskey_name}_{whiskey_id}"):
+                        if f"{whiskey_name}_{whiskey_id}" not in st.session_state.wishlist:
+                            st.session_state.wishlist.append(f"{whiskey_name}_{whiskey_id}")
 
 else:
     st.write("👆 Enter a description to find similar whiskeys.")
