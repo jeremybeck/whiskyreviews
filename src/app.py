@@ -3,6 +3,7 @@ from streamlit_pills import pills
 from vector_db import *
 from language_models import *
 # Initialize the vector store
+st.set_page_config(page_title="Whisk(e)y Explorer", page_icon="🥃")
 
 # Streamlit App Title
 st.title("🥃 Whiskey Recommender")
