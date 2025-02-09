@@ -4,6 +4,8 @@ from langchain_mongodb.vectorstores import MongoDBAtlasVectorSearch
 import certifi
 import streamlit as st
 from language_models import embedding_model
+from bson.binary import Binary, BinaryVectorDtype
+
 
 uri = f"mongodb+srv://{st.secrets['whiskeydb_ro']}:{st.secrets['whiskeydb_pwd_ro']}@{st.secrets['whiskeydb_url']}/?retryWrites=true&w=majority&appName=WhiskeyRecommender"
 ca = certifi.where()
@@ -34,3 +36,4 @@ vector_store = MongoDBAtlasVectorSearch(
 
 reviews = client['whiskey_reviews']['parsed_reviews']
 
+multiembed = client['whiskey_database']['vectordb_multiembed']
