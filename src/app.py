@@ -112,8 +112,8 @@ def query_multiple(nose_tags=None, palette_tags=None, finish_tags=None, filters=
                 "index": "multiembed_index_test",
                 "path": "nose_embedding",
                 "queryVector": nose_embedding,
-                "numCandidates": 5000,
-                "limit": top_k,
+                "numCandidates": 10000,
+                "limit": 5000,
                 "filter": filter_criteria
             }},
             {
@@ -131,8 +131,8 @@ def query_multiple(nose_tags=None, palette_tags=None, finish_tags=None, filters=
                 "index": "multiembed_index_test",
                 "path": "palette_embedding",
                 "queryVector": palette_embedding,
-                "numCandidates": 5000,
-                "limit": top_k,
+                "numCandidates": 10000,
+                "limit": 5000,
                 "filter": filter_criteria
             }},
             {
@@ -150,8 +150,8 @@ def query_multiple(nose_tags=None, palette_tags=None, finish_tags=None, filters=
                 "index": "multiembed_index_test",
                 "path": "finish_embedding",
                 "queryVector": finish_embedding,
-                "numCandidates": 5000,
-                "limit": top_k,
+                "numCandidates": 10000,
+                "limit": 5000,
                 "filter": filter_criteria
             }},
             {
@@ -179,7 +179,7 @@ def query_multiple(nose_tags=None, palette_tags=None, finish_tags=None, filters=
             scores[result["_id"]].append(result["score"])
 
     # Compute final score as the average of available scores
-    final_scores = {k: np.mean(v) for k, v in scores.items()}  # Only average non-empty scores
+    final_scores = {k: np.sum(v)/3 for k, v in scores.items()}  # Only average non-empty scores
 
     # Sort by best score
     sorted_results = sorted(final_scores.items(), key=lambda x: x[1], reverse=True)
