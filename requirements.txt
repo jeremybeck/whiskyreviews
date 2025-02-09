@@ -12,3 +12,4 @@ scipy
 scikit-learn
 sentence-transformers
 numpy<2
+streamlit-pills
