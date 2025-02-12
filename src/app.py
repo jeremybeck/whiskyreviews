@@ -1,7 +1,7 @@
 import streamlit as st
 from collections import defaultdict
 import numpy as np
-from streamlit_pills import pills
+from streamlit import pills
 from vector_db import *
 from language_models import *
 
