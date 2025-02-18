@@ -188,9 +188,7 @@ def query_multiple(nose_tags=None, palette_tags=None, finish_tags=None, filters=
 
     return final_whiskeys
 
-search, review = st.tabs(['Search', 'Review'])
-
-with search:
+with st.expander('Search', expanded=True):
     if advanced_search:
         # Show form for advanced search filters
         with st.form("Advanced Tasting Notes"):
@@ -232,26 +230,28 @@ with search:
 
     if results:
         st.subheader("🍂 Recommended Whiskeys")
-        for doc, score in results:
-            try:
-                whiskey_name = doc.metadata.get("whiskey_name", "Unknown Whiskey")
-                whiskey_id = doc.metadata.get('_id')
-            except:
-                whiskey_name = doc.get("whiskey_name", "Unknown Whiskey")
-                whiskey_id = doc.get('_id')
-            with st.expander(f"**{whiskey_name}** (Score: {score:.2f}) (ID: {whiskey_id}) "):
-                try:
-                    display_whiskey(doc, json_flag=advanced_search)  # ✅ Use the new function
-                    # Bookmark button
-                    if st.button(f"📌 Add {whiskey_name} to Wishlist", key=f"{whiskey_name}_{whiskey_id}"):
-                        if f"{whiskey_name}_{whiskey_id}" not in st.session_state.wishlist:
-                            st.session_state.wishlist.append(f"{whiskey_name}_{whiskey_id}")
-                except:
-                    pass
+        max_columns = 2
+        num_rows = (num_whiskies + max_columns - 1) // max_columns  # This rounds up the division to ensure full rows
+        # Create containers for each row
+        for row in range(num_rows):
+            cols = st.columns(max_columns)  # Create a row with up to 3 columns
+            for col in range(min(max_columns, num_whiskies - row * max_columns)):  # Ensure we don't exceed k items
+                with cols[col]:
+                    item_index = row * max_columns + col  # Calculate the item index
+                    if item_index < num_whiskies:
+                        with st.container(border=True):
+                            try:
+                                display_whiskey(results[item_index][0], json_flag=advanced_search)
+                                if st.button(f"📌 Add {whiskey_name} to Wishlist", key=f"{whiskey_name}_{whiskey_id}"):
+                                    if f"{whiskey_name}_{whiskey_id}" not in st.session_state.wishlist:
+                                        st.session_state.wishlist.append(f"{whiskey_name}_{whiskey_id}")
+                            except:
+                                pass  # Replace this with your actual content
+
 
     else:
         st.write("👆 Enter a description to find similar whiskeys.")
 
 
-with review:
+with st.expander('Review', expanded=False):
     display_drinking_session()
