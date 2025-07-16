@@ -1,4 +1,5 @@
 import streamlit as st
+import re
 from collections import defaultdict
 import numpy as np
 from streamlit import pills
@@ -35,45 +36,69 @@ selected_country = st.sidebar.selectbox("🥃 Filter by Country", ["All"] + dist
 # Add advanced search flag to the sidebar
 advanced_search = st.sidebar.checkbox("🔍 Enable Advanced Search - Alpha")
 results = None
+def display_whiskey(whiskey_doc, advanced_search=False, query=None,
+                    nose_query="", palette_query="", finish_query=""):
+    # Extract metadata
+    distillery = whiskey_doc.get("distillery", "Unknown Distillery") if advanced_search \
+        else whiskey_doc.metadata.get("distillery", "Unknown Distillery")
+    whiskey_name = whiskey_doc.get("whiskey_name", "Unknown Whiskey") if advanced_search \
+        else whiskey_doc.metadata.get("whiskey_name", "Unknown Whiskey")
+    age = whiskey_doc.get("age", "No Age Statement") if advanced_search \
+        else whiskey_doc.metadata.get("age", "No Age Statement")
+    region = whiskey_doc.get("distillery_region", "Unknown Region") if advanced_search \
+        else whiskey_doc.metadata.get("distillery_region", "Unknown Region")
+    nose_tags = whiskey_doc.get("nose_tags", []) if advanced_search \
+        else whiskey_doc.metadata.get("nose_tags", [])
+    palette_tags = whiskey_doc.get("palette_tags", []) if advanced_search \
+        else whiskey_doc.metadata.get("palette_tags", [])
+    finish_tags = whiskey_doc.get("finish_tags", []) if advanced_search \
+        else whiskey_doc.metadata.get("finish_tags", [])
 
-def display_whiskey(whiskey_doc, json_flag=None):
-
-    if json_flag:
-        #""" whiskey details in markdown format with tag pills."""
-        # Extract metadata
-        distillery = whiskey_doc.get("distillery", "Unknown Distillery")
-        whiskey_name = whiskey_doc.get("whiskey_name", "Unknown Whiskey")
-        age = whiskey_doc.get("age", "No Age Statement")
-        region = whiskey_doc.get("distillery_region", "Unknown Region")
-        nose_tags = whiskey_doc.get("nose_tags", [])
-        palette_tags = whiskey_doc.get("palette_tags", [])
-        finish_tags = whiskey_doc.get("finish_tags", [])
-
-    else:
-        #"""Displays whiskey details in markdown format with tag pills."""
-        # Extract metadata
-        distillery = whiskey_doc.metadata.get("distillery", "Unknown Distillery")
-        whiskey_name = whiskey_doc.metadata.get("whiskey_name", "Unknown Whiskey")
-        age = whiskey_doc.metadata.get("age", "No Age Statement")
-        region = whiskey_doc.metadata.get("distillery_region", "Unknown Region")
-        nose_tags = whiskey_doc.metadata.get("nose_tags", [])
-        palette_tags = whiskey_doc.metadata.get("palette_tags", [])
-        finish_tags = whiskey_doc.metadata.get("finish_tags", [])
-
-    # Markdown display
+    # Display metadata
     st.markdown(f"### {whiskey_name}")
     st.markdown(f"**{distillery}**")
-    st.markdown(f"🕰️ Age: {age}")  # Age Statement
-    st.markdown(f"📍 Region: {region}")  # Region
+    st.markdown(f"🕰️ Age: {age}")
+    st.markdown(f"📍 Region: {region}")
 
-    # Display tags as pills
-    if nose_tags:
-        pills("👃 Nose Notes:", nose_tags)
-    if palette_tags:
-        pills("👅 Palette Notes:", palette_tags)
-    if finish_tags:
-        pills("🥃 Finish Notes:", finish_tags)
+    # Parse query words
+    def extract_words(text):
+        return set(re.findall(r'\b\w+\b', text.lower()))
 
+    if advanced_search:
+        nose_words = extract_words(nose_query)
+        palette_words = extract_words(palette_query)
+        finish_words = extract_words(finish_query)
+    else:
+        shared_words = extract_words(query or "")
+        nose_words = palette_words = finish_words = shared_words
+
+    def is_tag_match(tag, matched_words):
+        tag_words = set(re.findall(r'\b\w+\b', tag.lower()))
+        return not tag_words.isdisjoint(matched_words)
+
+    def render_tags(label, tags, matched_words):
+        # Label header
+        label_html = f"<strong>{label}</strong><br>"
+
+        # All tags in one flat HTML string
+        pill_html = ""
+        for tag in tags:
+            match = is_tag_match(tag, matched_words)
+            bg_color = "#FFD700" if match else "#e0e0e0"
+            text_color = "#000000" if match else "#555555"
+            pill_html += (
+                f"<span style='display:inline-block; background-color:{bg_color}; color:{text_color}; "
+                f"padding:4px 10px; margin:2px 6px 6px 0; border-radius:15px; font-size:0.85rem;'>"
+                f"{tag}</span>"
+            )
+
+        # Render everything in one markdown block
+        st.markdown(label_html + pill_html, unsafe_allow_html=True)
+
+
+    render_tags("👃 Nose Notes:", nose_tags, nose_words)
+    render_tags("👅 Palette Notes:", palette_tags, palette_words)
+    render_tags("🥃 Finish Notes:", finish_tags, finish_words)
 
 def construct_pre_filter(selected_region=None, selected_type=None, selected_country=None):
     pre_filter = {}
@@ -241,7 +266,12 @@ with st.expander('Search', expanded=True):
                     if item_index < num_whiskies:
                         with st.container(border=True):
                             try:
-                                display_whiskey(results[item_index][0], json_flag=advanced_search)
+                                if advanced_search:
+                                    display_whiskey(results[item_index][0], advanced_search=advanced_search,
+                                                    nose_query=nose_tags, palette_query=palette_tags,
+                                                    finish_query=finish_tags)
+                                else:
+                                    display_whiskey(results[item_index][0], advanced_search=advanced_search, query=query)
                                 if st.button(f"📌 Add {whiskey_name} to Wishlist", key=f"{whiskey_name}_{whiskey_id}"):
                                     if f"{whiskey_name}_{whiskey_id}" not in st.session_state.wishlist:
                                         st.session_state.wishlist.append(f"{whiskey_name}_{whiskey_id}")
