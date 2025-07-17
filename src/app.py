@@ -241,7 +241,8 @@ with st.expander('Search', expanded=True):
             results = query_multiple(nose_tags=nose_tags, palette_tags=palette_tags, finish_tags=finish_tags, filters=filter_conditions, top_k=num_whiskies)
     else:
         # User Query Input
-        query = st.text_input("🔍 Describe what you're looking for in a whiskey:")
+        query = st.text_input("🔍 Describe what you're looking for in a whiskey:",
+                              help="Want to get more specific about nose, palette, and finish? Enable Advanced Search in the sidebar.")
         if query:
             filter_conditions = construct_pre_filter(selected_region=selected_region, selected_type=selected_type,
                                                      selected_country=selected_country)
