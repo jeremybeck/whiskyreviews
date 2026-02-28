@@ -72,7 +72,7 @@ if not st.session_state.get("authentication_status"):
 
     with tab_login:
         authenticator = _build_authenticator()
-        authenticator.login("Login", "main")
+        authenticator.login(location="main")
         if st.session_state.get("authentication_status") is False:
             st.error("Username or password is incorrect.")
         elif st.session_state.get("authentication_status") is None:
@@ -100,7 +100,7 @@ st.title("🥃 Whiskey Recommender")
 
 # Sidebar: user info + logout (INT-8)
 st.sidebar.header(f"👤 {st.session_state.get('name', st.session_state.get('username', 'User'))}")
-authenticator.logout("Logout", "sidebar")
+authenticator.logout(location="sidebar")
 
 # Sidebar Wishlist
 st.sidebar.header("📌 Wishlist")
