@@ -4,13 +4,103 @@ import numpy as np
 from streamlit_pills import pills
 from vector_db import *
 from language_models import *
+import streamlit_authenticator as stauth
+from auth_utils import hash_password
+from user_db import (
+    get_user_by_username,
+    get_user_by_email,
+    create_user,
+    load_authenticator_credentials,
+)
 
 
 # Initialize the vector store
 st.set_page_config(page_title="Whisk(e)y Explorer", page_icon="🥃")
 
+
+# ---------------------------------------------------------------------------
+# Authentication (INT-5, INT-6, INT-7, INT-8)
+# ---------------------------------------------------------------------------
+
+@st.cache_resource
+def _build_authenticator():
+    """Build the streamlit-authenticator Authenticate object from MongoDB users."""
+    try:
+        credentials = load_authenticator_credentials()
+    except Exception:
+        credentials = {"usernames": {}}
+    return stauth.Authenticate(
+        credentials,
+        st.secrets.get("cookie_name", "whiskey_auth"),
+        st.secrets.get("cookie_key", "whiskey_change_me_in_production"),
+        cookie_expiry_days=30,
+    )
+
+
+def _render_registration_form():
+    st.subheader("Create an account")
+    with st.form("registration_form", clear_on_submit=True):
+        reg_username = st.text_input("Username")
+        reg_email = st.text_input("Email")
+        reg_password = st.text_input("Password", type="password")
+        reg_password2 = st.text_input("Confirm password", type="password")
+        submitted = st.form_submit_button("Register")
+
+    if submitted:
+        if len(reg_username) < 3:
+            st.error("Username must be at least 3 characters.")
+        elif not reg_email or "@" not in reg_email:
+            st.error("Please enter a valid email address.")
+        elif reg_password != reg_password2:
+            st.error("Passwords do not match.")
+        elif get_user_by_username(reg_username):
+            st.error("That username is already taken.")
+        elif get_user_by_email(reg_email):
+            st.error("An account with that email already exists.")
+        else:
+            create_user(reg_username, reg_email, hash_password(reg_password))
+            # Bust credential cache so the new user can log in immediately
+            load_authenticator_credentials.clear()
+            _build_authenticator.clear()
+            st.success("Account created! Please switch to the Login tab.")
+
+
+# Gate the app on authentication status (INT-8)
+if not st.session_state.get("authentication_status"):
+    st.title("🥃 Whiskey Recommender")
+    tab_login, tab_register = st.tabs(["🔐 Login", "📝 Register"])
+
+    with tab_login:
+        authenticator = _build_authenticator()
+        authenticator.login("Login", "main")
+        if st.session_state.get("authentication_status") is False:
+            st.error("Username or password is incorrect.")
+        elif st.session_state.get("authentication_status") is None:
+            st.info("Enter your credentials to continue.")
+
+    with tab_register:
+        _render_registration_form()
+
+    st.stop()
+
+# ---------------------------------------------------------------------------
+# Authenticated app
+# ---------------------------------------------------------------------------
+
+# Persist user_id in session state (INT-8)
+if "user_id" not in st.session_state:
+    _user_doc = get_user_by_username(st.session_state.get("username", ""))
+    if _user_doc:
+        st.session_state["user_id"] = str(_user_doc["_id"])
+
+authenticator = _build_authenticator()
+
 # Streamlit App Title
 st.title("🥃 Whiskey Recommender")
+
+# Sidebar: user info + logout (INT-8)
+st.sidebar.header(f"👤 {st.session_state.get('name', st.session_state.get('username', 'User'))}")
+authenticator.logout("Logout", "sidebar")
 
 # Sidebar Wishlist
 st.sidebar.header("📌 Wishlist")
