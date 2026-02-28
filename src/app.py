@@ -247,7 +247,7 @@ with st.expander('Search', expanded=True):
             filter_conditions = construct_pre_filter(selected_region=selected_region, selected_type=selected_type,
                                                      selected_country=selected_country)
             # Search vector database
-            results = vector_store.similarity_search_with_score(query, k=num_whiskies, pre_filter=filter_conditions)
+            results = vector_store.similarit/y_search_with_score(query, k=num_whiskies, pre_filter=filter_conditions)
 
 
     if results:
