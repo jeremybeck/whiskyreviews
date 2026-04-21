@@ -22,9 +22,8 @@ st.set_page_config(page_title="Whisk(e)y Explorer", page_icon="🥃")
 # Authentication (INT-5, INT-6, INT-7, INT-8)
 # ---------------------------------------------------------------------------
 
-@st.cache_resource
 def _build_authenticator():
-    """Build the streamlit-authenticator Authenticate object from MongoDB users."""
+    """Build a streamlit-authenticator Authenticate object from cached MongoDB credentials."""
     try:
         credentials = load_authenticator_credentials()
     except Exception:
@@ -44,10 +43,14 @@ def _render_registration_form():
         reg_email = st.text_input("Email")
         reg_password = st.text_input("Password", type="password")
         reg_password2 = st.text_input("Confirm password", type="password")
+        reg_signup_code = st.text_input("Signup Code")
         submitted = st.form_submit_button("Register")
 
     if submitted:
-        if len(reg_username) < 3:
+        expected_code = str(st.secrets.get("signup_code", ""))
+        if reg_signup_code != expected_code:
+            st.error("Invalid signup code.")
+        elif len(reg_username) < 3:
             st.error("Username must be at least 3 characters.")
         elif not reg_email or "@" not in reg_email:
             st.error("Please enter a valid email address.")
@@ -61,9 +64,11 @@ def _render_registration_form():
             create_user(reg_username, reg_email, hash_password(reg_password))
             # Bust credential cache so the new user can log in immediately
             load_authenticator_credentials.clear()
-            _build_authenticator.clear()
             st.success("Account created! Please switch to the Login tab.")
 
+
+# Build authenticator once at the top so the cookie is read before the auth check.
+authenticator = _build_authenticator()
 
 # Gate the app on authentication status (INT-8)
 if not st.session_state.get("authentication_status"):
@@ -71,11 +76,12 @@ if not st.session_state.get("authentication_status"):
     tab_login, tab_register = st.tabs(["🔐 Login", "📝 Register"])
 
     with tab_login:
-        authenticator = _build_authenticator()
         authenticator.login(location="main")
-        if st.session_state.get("authentication_status") is False:
+        if st.session_state.get("authentication_status"):
+            st.rerun()
+        elif st.session_state.get("authentication_status") is False:
             st.error("Username or password is incorrect.")
-        elif st.session_state.get("authentication_status") is None:
+        else:
             st.info("Enter your credentials to continue.")
 
     with tab_register:
@@ -92,8 +98,6 @@ if "user_id" not in st.session_state:
     _user_doc = get_user_by_username(st.session_state.get("username", ""))
     if _user_doc:
         st.session_state["user_id"] = str(_user_doc["_id"])
-
-authenticator = _build_authenticator()
 
 # Streamlit App Title
 st.title("🥃 Whiskey Recommender")
@@ -199,7 +203,7 @@ def query_multiple(nose_tags=None, palette_tags=None, finish_tags=None, filters=
         nose_embedding = Binary.from_vector(embedding_model.embed_query(nose_tags), BinaryVectorDtype.FLOAT32)
         nose_results = list(multiembed.aggregate([
             {"$vectorSearch": {
-                "index": "multiembed_index_test",
+                "index": "test_index",
                 "path": "nose_embedding",
                 "queryVector": nose_embedding,
                 "numCandidates": 10000,
@@ -218,7 +222,7 @@ def query_multiple(nose_tags=None, palette_tags=None, finish_tags=None, filters=
         palette_embedding = Binary.from_vector(embedding_model.embed_query(palette_tags), BinaryVectorDtype.FLOAT32)
         palette_results = list(multiembed.aggregate([
             {"$vectorSearch": {
-                "index": "multiembed_index_test",
+                "index": "test_index",
                 "path": "palette_embedding",
                 "queryVector": palette_embedding,
                 "numCandidates": 10000,
@@ -237,7 +241,7 @@ def query_multiple(nose_tags=None, palette_tags=None, finish_tags=None, filters=
         finish_embedding = Binary.from_vector(embedding_model.embed_query(finish_tags), BinaryVectorDtype.FLOAT32)
         finish_results = list(multiembed.aggregate([
             {"$vectorSearch": {
-                "index": "multiembed_index_test",
+                "index": "test_index",
                 "path": "finish_embedding",
                 "queryVector": finish_embedding,
                 "numCandidates": 10000,
@@ -306,7 +310,16 @@ else:
         filter_conditions = construct_pre_filter(selected_region=selected_region, selected_type=selected_type,
                                                  selected_country=selected_country)
         # Search vector database
-        results = vector_store.similarity_search_with_score(query, k=num_whiskies, pre_filter=filter_conditions)
+        try:
+            with st.spinner("Searching..."):
+                search_kwargs = {"k": num_whiskies}
+                if filter_conditions:
+                    search_kwargs["pre_filter"] = filter_conditions
+                results = vector_store.similarity_search_with_score(query, **search_kwargs)
+            if not results:
+                st.warning("No results returned. Check that the Atlas vector search index 'test_index' is active.")
+        except Exception as e:
+            st.error(f"Search error: {e}")
 
 
 if results:

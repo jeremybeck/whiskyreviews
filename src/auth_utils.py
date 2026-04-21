@@ -1,13 +1,11 @@
-from passlib.context import CryptContext
-
-_pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+import streamlit_authenticator as stauth
 
 
 def hash_password(plain: str) -> str:
-    """Hash a plaintext password with bcrypt."""
-    return _pwd_context.hash(plain)
+    """Hash a plaintext password using streamlit-authenticator's native bcrypt hasher."""
+    return stauth.Hasher._hash(plain)
 
 
 def verify_password(plain: str, hashed: str) -> bool:
-    """Return True if plain matches the bcrypt hash."""
-    return _pwd_context.verify(plain, hashed)
+    """Verify a plaintext password against a stored hash."""
+    return stauth.Hasher.check_pw(plain, hashed)

@@ -27,10 +27,10 @@ except Exception as e:
 vectordb = client["whiskey_database"]["vectordb_singleembed"]
 
 vector_store = MongoDBAtlasVectorSearch(
-   collection = vectordb,         # Collection to store embeddings
-   embedding = embedding_model,   # Embedding model to use
-   index_name = "test_index",    # Name of the vector search index
-   relevance_score_fn = "cosine"   # Similarity score function, can also be "euclidean" or "dotProduct"
+   collection = vectordb,
+   embedding = embedding_model,
+   index_name = "test_index",
+   relevance_score_fn = "cosine"
 )
 
 
