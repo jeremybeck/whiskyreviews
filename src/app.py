@@ -1,7 +1,8 @@
 import streamlit as st
+import re
 from collections import defaultdict
 import numpy as np
-from streamlit_pills import pills
+from streamlit import pills
 from vector_db import *
 from language_models import *
 import streamlit_authenticator as stauth
@@ -13,6 +14,7 @@ from user_db import (
     load_authenticator_credentials,
 )
 
+from sessions import display_drinking_session
 
 # Initialize the vector store
 st.set_page_config(page_title="Whisk(e)y Explorer", page_icon="🥃")
@@ -130,44 +132,63 @@ selected_country = st.sidebar.selectbox("🥃 Filter by Country", ["All"] + dist
 advanced_search = st.sidebar.checkbox("🔍 Enable Advanced Search - Alpha")
 results = None
 
-def display_whiskey(whiskey_doc, json_flag=None):
+def display_whiskey(whiskey_doc, advanced_search=False, query=None,
+                    nose_query="", palette_query="", finish_query=""):
 
-    if json_flag:
-        #""" whiskey details in markdown format with tag pills."""
-        # Extract metadata
-        distillery = whiskey_doc.get("distillery", "Unknown Distillery")
-        whiskey_name = whiskey_doc.get("whiskey_name", "Unknown Whiskey")
-        age = whiskey_doc.get("age", "No Age Statement")
-        region = whiskey_doc.get("distillery_region", "Unknown Region")
+    # Metadata accessor
+    get = whiskey_doc.get if advanced_search else whiskey_doc.metadata.get
 
-        nose_tags = whiskey_doc.get("nose_tags", [])
-        palette_tags = whiskey_doc.get("palette_tags", [])
-        finish_tags = whiskey_doc.get("finish_tags", [])
-    else:
-        #"""Displays whiskey details in markdown format with tag pills."""
-        # Extract metadata
-        distillery = whiskey_doc.metadata.get("distillery", "Unknown Distillery")
-        whiskey_name = whiskey_doc.metadata.get("whiskey_name", "Unknown Whiskey")
-        age = whiskey_doc.metadata.get("age", "No Age Statement")
-        region = whiskey_doc.metadata.get("distillery_region", "Unknown Region")
+    # Metadata fields
+    distillery = get("distillery", "Unknown Distillery")
+    whiskey_name = get("whiskey_name", "Unknown Whiskey")
+    age = get("age", "No Age Statement")
+    region = get("distillery_region", "Unknown Region")
+    nose_tags = get("nose_tags", [])
+    palette_tags = get("palette_tags", [])
+    finish_tags = get("finish_tags", [])
 
-        nose_tags = whiskey_doc.metadata.get("nose_tags", [])
-        palette_tags = whiskey_doc.metadata.get("palette_tags", [])
-        finish_tags = whiskey_doc.metadata.get("finish_tags", [])
-
-    # Markdown display
+    # Display metadata
     st.markdown(f"### {whiskey_name}")
     st.markdown(f"**{distillery}**")
-    st.markdown(f"🕰️ Age: {age}")  # Age Statement
-    st.markdown(f"📍 Region: {region}")  # Region
+    st.markdown(f"🕰️ Age: {age}")
+    st.markdown(f"📍 Region: {region}")
 
-    # Display tags as pills
-    if nose_tags:
-        pills("👃 Nose Notes:", nose_tags, format_func=lambda x: x, index=None)
-    if palette_tags:
-        pills("👅 Palette Notes:", palette_tags, format_func=lambda x: x, index=None)
-    if finish_tags:
-        pills("🥃 Finish Notes:", finish_tags, format_func=lambda x: x, index=None)
+    # Extract input keywords
+    def extract_words(text):
+        return set(re.findall(r'\b\w+\b', text.lower()))
+
+    if advanced_search:
+        nose_words = extract_words(nose_query)
+        palette_words = extract_words(palette_query)
+        finish_words = extract_words(finish_query)
+    else:
+        shared_words = extract_words(query or "")
+        nose_words = palette_words = finish_words = shared_words
+
+    # Matching logic
+    def is_tag_match(tag, matched_words):
+        tag_words = set(re.findall(r'\b\w+\b', tag.lower()))
+        return not tag_words.isdisjoint(matched_words)
+
+    # Tag rendering
+    def render_tags(label, tags, matched_words):
+        label_html = f"<strong>{label}</strong><br>"
+        pill_html = ""
+        for tag in tags:
+            match = is_tag_match(tag, matched_words)
+            bg_color = "#FFD700" if match else "#e0e0e0"
+            text_color = "#000000" if match else "#555555"
+            pill_html += (
+                f"<span style='display:inline-block; background-color:{bg_color}; color:{text_color}; "
+                f"padding:4px 10px; margin:2px 6px 6px 0; border-radius:15px; font-size:0.85rem;'>"
+                f"{tag}</span>"
+            )
+        st.markdown(label_html + pill_html, unsafe_allow_html=True)
+
+    # Render each tag section
+    render_tags("👃 Nose Notes", nose_tags, nose_words)
+    render_tags("👅 Palette Notes", palette_tags, palette_words)
+    render_tags("🥃 Finish Notes", finish_tags, finish_words)
 
 
 def construct_pre_filter(selected_region=None, selected_type=None, selected_country=None):
@@ -283,16 +304,26 @@ def query_multiple(nose_tags=None, palette_tags=None, finish_tags=None, filters=
 
     return final_whiskeys
 
-if advanced_search:
-    # Show form for advanced search filters
-    with st.form("Advanced Tasting Notes"):
-        st.write("🔍 **Advanced Search Filters**")
-        nose_notes = st.text_input("👃 Enter Nose Notes (comma-separated)", "")
-        palette_notes = st.text_input("👅 Enter Palette Notes (comma-separated)", "")
-        finish_notes = st.text_input("🥃 Enter Finish Notes (comma-separated)", "")
+with st.expander('Search', expanded=True):
+    if advanced_search:
+        # Show form for advanced search filters
+        with st.form("Advanced Tasting Notes"):
+            st.write("🔍 **Advanced Search Filters**")
+            #if 'nose_likes' not in st.session_state:
+            #    st.session_state.nose_likes = []
+            #if 'palette_likes' not in st.session_state:
+            #    st.session_state.palette_likes = []
+            #if 'finish_likes' not in st.session_state:
+            #    st.session_state.finish_likes = []
 
-        # Submit button for the advanced form
-        submitted = st.form_submit_button("Submit Advanced Search")
+
+            nose_notes = st.text_input("👃 Enter Nose Notes (comma-separated)", ','.join(st.session_state.get('nose_likes',[])))
+            palette_notes = st.text_input("👅 Enter Palette Notes (comma-separated)", ','.join(st.session_state.get('palette_likes',[])))
+            finish_notes = st.text_input("🥃 Enter Finish Notes (comma-separated)", ','.join(st.session_state.get('finish_likes',[])))
+
+            # Submit button for the advanced form
+            submitted = st.form_submit_button("Submit Advanced Search")
+
         if submitted:
             # Split the notes input into lists of tags
             nose_tags = nose_notes if nose_notes else None
@@ -303,43 +334,46 @@ if advanced_search:
                                                      selected_country=selected_country)
 
             results = query_multiple(nose_tags=nose_tags, palette_tags=palette_tags, finish_tags=finish_tags, filters=filter_conditions, top_k=num_whiskies)
-else:
-    # User Query Input
-    query = st.text_input("🔍 Describe what you're looking for in a whiskey:")
-    if query:
-        filter_conditions = construct_pre_filter(selected_region=selected_region, selected_type=selected_type,
-                                                 selected_country=selected_country)
-        # Search vector database
-        try:
-            with st.spinner("Searching..."):
-                search_kwargs = {"k": num_whiskies}
-                if filter_conditions:
-                    search_kwargs["pre_filter"] = filter_conditions
-                results = vector_store.similarity_search_with_score(query, **search_kwargs)
-            if not results:
-                st.warning("No results returned. Check that the Atlas vector search index 'test_index' is active.")
-        except Exception as e:
-            st.error(f"Search error: {e}")
+    else:
+        # User Query Input
+        query = st.text_input("🔍 Describe what you're looking for in a whiskey:",
+                              help="Want to get more specific about nose, palette, and finish? Enable Advanced Search in the sidebar.")
+        if query:
+            filter_conditions = construct_pre_filter(selected_region=selected_region, selected_type=selected_type,
+                                                     selected_country=selected_country)
+            # Search vector database
+            results = vector_store.similarity_search_with_score(query, k=num_whiskies, pre_filter=filter_conditions)
 
 
-if results:
-    st.subheader("🍂 Recommended Whiskeys")
-    for doc, score in results:
-        try:
-            whiskey_name = doc.metadata.get("whiskey_name", "Unknown Whiskey")
-            whiskey_id = doc.metadata.get('_id')
-        except:
-            whiskey_name = doc.get("whiskey_name", "Unknown Whiskey")
-            whiskey_id = doc.get('_id')
-        with st.expander(f"**{whiskey_name}** (Score: {score:.2f}) (ID: {whiskey_id}) "):
-            try:
-                display_whiskey(doc, json_flag=advanced_search)  # ✅ Use the new function
-                # Bookmark button
-                if st.button(f"📌 Add {whiskey_name} to Wishlist", key=f"{whiskey_name}_{whiskey_id}"):
-                    if f"{whiskey_name}_{whiskey_id}" not in st.session_state.wishlist:
-                        st.session_state.wishlist.append(f"{whiskey_name}_{whiskey_id}")
-            except:
-                pass
+    if results:
+        st.subheader("🍂 Recommended Whiskeys")
+        max_columns = 2
+        num_rows = (num_whiskies + max_columns - 1) // max_columns  # This rounds up the division to ensure full rows
+        # Create containers for each row
+        for row in range(num_rows):
+            cols = st.columns(max_columns)  # Create a row with up to 3 columns
+            for col in range(min(max_columns, num_whiskies - row * max_columns)):  # Ensure we don't exceed k items
+                with cols[col]:
+                    item_index = row * max_columns + col  # Calculate the item index
+                    if item_index < num_whiskies:
+                        with st.container(border=True):
+                            try:
+                                if advanced_search:
+                                    display_whiskey(results[item_index][0], advanced_search=advanced_search,
+                                                    nose_query=nose_notes, palette_query=palette_notes,
+                                                    finish_query=finish_notes)
+                                else:
+                                    display_whiskey(results[item_index][0], advanced_search=advanced_search, query=query)
+                                if st.button(f"📌 Add {whiskey_name} to Wishlist", key=f"{whiskey_name}_{whiskey_id}"):
+                                    if f"{whiskey_name}_{whiskey_id}" not in st.session_state.wishlist:
+                                        st.session_state.wishlist.append(f"{whiskey_name}_{whiskey_id}")
+                            except:
+                                pass  # Replace this with your actual content
 
-else:
-    st.write("👆 Enter a description to find similar whiskeys.")
+
+    else:
+        st.write("👆 Enter a description to find similar whiskeys.")
+
+
+with st.expander('Review', expanded=False):
+    display_drinking_session()
