@@ -12,3 +12,5 @@ scipy
 scikit-learn
 sentence-transformers
 numpy<2
+streamlit-pills
+streamlit-authenticator>=0.3.3,<0.4.0

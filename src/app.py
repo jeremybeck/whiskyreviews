@@ -5,13 +5,108 @@ import numpy as np
 from streamlit import pills
 from vector_db import *
 from language_models import *
+import streamlit_authenticator as stauth
+from auth_utils import hash_password
+from user_db import (
+    get_user_by_username,
+    get_user_by_email,
+    create_user,
+    load_authenticator_credentials,
+)
+
 from sessions import display_drinking_session
 
 # Initialize the vector store
 st.set_page_config(page_title="Whisk(e)y Explorer", page_icon="🥃")
 
+
+# ---------------------------------------------------------------------------
+# Authentication (INT-5, INT-6, INT-7, INT-8)
+# ---------------------------------------------------------------------------
+
+def _build_authenticator():
+    """Build a streamlit-authenticator Authenticate object from cached MongoDB credentials."""
+    try:
+        credentials = load_authenticator_credentials()
+    except Exception:
+        credentials = {"usernames": {}}
+    return stauth.Authenticate(
+        credentials,
+        st.secrets.get("cookie_name", "whiskey_auth"),
+        st.secrets.get("cookie_key", "whiskey_change_me_in_production"),
+        cookie_expiry_days=30,
+    )
+
+
+def _render_registration_form():
+    st.subheader("Create an account")
+    with st.form("registration_form", clear_on_submit=True):
+        reg_username = st.text_input("Username")
+        reg_email = st.text_input("Email")
+        reg_password = st.text_input("Password", type="password")
+        reg_password2 = st.text_input("Confirm password", type="password")
+        reg_signup_code = st.text_input("Signup Code")
+        submitted = st.form_submit_button("Register")
+
+    if submitted:
+        expected_code = str(st.secrets.get("signup_code", ""))
+        if reg_signup_code != expected_code:
+            st.error("Invalid signup code.")
+        elif len(reg_username) < 3:
+            st.error("Username must be at least 3 characters.")
+        elif not reg_email or "@" not in reg_email:
+            st.error("Please enter a valid email address.")
+        elif reg_password != reg_password2:
+            st.error("Passwords do not match.")
+        elif get_user_by_username(reg_username):
+            st.error("That username is already taken.")
+        elif get_user_by_email(reg_email):
+            st.error("An account with that email already exists.")
+        else:
+            create_user(reg_username, reg_email, hash_password(reg_password))
+            # Bust credential cache so the new user can log in immediately
+            load_authenticator_credentials.clear()
+            st.success("Account created! Please switch to the Login tab.")
+
+
+# Build authenticator once at the top so the cookie is read before the auth check.
+authenticator = _build_authenticator()
+
+# Gate the app on authentication status (INT-8)
+if not st.session_state.get("authentication_status"):
+    st.title("🥃 Whiskey Recommender")
+    tab_login, tab_register = st.tabs(["🔐 Login", "📝 Register"])
+
+    with tab_login:
+        authenticator.login(location="main")
+        if st.session_state.get("authentication_status"):
+            st.rerun()
+        elif st.session_state.get("authentication_status") is False:
+            st.error("Username or password is incorrect.")
+        else:
+            st.info("Enter your credentials to continue.")
+
+    with tab_register:
+        _render_registration_form()
+
+    st.stop()
+
+# ---------------------------------------------------------------------------
+# Authenticated app
+# ---------------------------------------------------------------------------
+
+# Persist user_id in session state (INT-8)
+if "user_id" not in st.session_state:
+    _user_doc = get_user_by_username(st.session_state.get("username", ""))
+    if _user_doc:
+        st.session_state["user_id"] = str(_user_doc["_id"])
+
 # Streamlit App Title
 st.title("🥃 Whiskey Recommender")
+
+# Sidebar: user info + logout (INT-8)
+st.sidebar.header(f"👤 {st.session_state.get('name', st.session_state.get('username', 'User'))}")
+authenticator.logout(location="sidebar")
 
 # Sidebar Wishlist
 st.sidebar.header("📌 Wishlist")
@@ -129,7 +224,7 @@ def query_multiple(nose_tags=None, palette_tags=None, finish_tags=None, filters=
         nose_embedding = Binary.from_vector(embedding_model.embed_query(nose_tags), BinaryVectorDtype.FLOAT32)
         nose_results = list(multiembed.aggregate([
             {"$vectorSearch": {
-                "index": "multiembed_index_test",
+                "index": "test_index",
                 "path": "nose_embedding",
                 "queryVector": nose_embedding,
                 "numCandidates": 10000,
@@ -148,7 +243,7 @@ def query_multiple(nose_tags=None, palette_tags=None, finish_tags=None, filters=
         palette_embedding = Binary.from_vector(embedding_model.embed_query(palette_tags), BinaryVectorDtype.FLOAT32)
         palette_results = list(multiembed.aggregate([
             {"$vectorSearch": {
-                "index": "multiembed_index_test",
+                "index": "test_index",
                 "path": "palette_embedding",
                 "queryVector": palette_embedding,
                 "numCandidates": 10000,
@@ -167,7 +262,7 @@ def query_multiple(nose_tags=None, palette_tags=None, finish_tags=None, filters=
         finish_embedding = Binary.from_vector(embedding_model.embed_query(finish_tags), BinaryVectorDtype.FLOAT32)
         finish_results = list(multiembed.aggregate([
             {"$vectorSearch": {
-                "index": "multiembed_index_test",
+                "index": "test_index",
                 "path": "finish_embedding",
                 "queryVector": finish_embedding,
                 "numCandidates": 10000,
